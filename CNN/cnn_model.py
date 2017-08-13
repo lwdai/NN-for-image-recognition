@@ -42,7 +42,9 @@ class Net(object):
 
         # May want to use another optimizer?
         optimizer = tf.train.GradientDescentOptimizer(self.lrn_rate)
-
+        #optimizer = tf.train.AdamOptimizer(self.lrn_rate)
+        #optimizer = tf.train.MomentumOptimizer(self.lrn_rate, 0.9)
+        
         apply_op = optimizer.apply_gradients(
             zip(grads, trainable_variables),
             global_step=self.global_step, name='train_step')
@@ -97,6 +99,33 @@ class Net(object):
                             initializer=tf.constant_initializer(init_bias))
         return tf.nn.xw_plus_b(x, w, b)
         
+    def _max_pool2x2(self, x):
+        return tf.nn.max_pool(x, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], 
+            padding='SAME', name='pool')
+            
+    def _lrn(self, x):
+        """ Local response normalization """
+        return tf.nn.lrn(x, 4, bias=1.0, alpha=0.001 / 9.0, beta=0.75, name='norm')
+        
+    def _global_avg_pool(self, x):
+        assert x.get_shape().ndims == 4
+        return tf.reduce_mean(x, [1, 2])
+        
+    def _build_output(self, x):
+        with tf.variable_scope('logit'):
+            logits = self._fully_connected(x, self.hps.num_classes)
+            self.predictions = tf.nn.softmax(logits)
+            
+        with tf.variable_scope('costs'):
+            # loss
+            xent = tf.nn.softmax_cross_entropy_with_logits(
+                logits=logits, labels=self.labels)
+            self.cost = tf.reduce_mean(xent, name='xent')
+            self.cost += self._decay()
+
+            tf.summary.scalar('cost', self.cost)       
+        
+        
                 
 class CNN_base(Net):
     #def __init__(self, hps, images, labels, mode):
@@ -129,19 +158,92 @@ class CNN_base(Net):
             x = self._fully_connected(x, 192, init_bias=0.1)
             x = self._relu(x)           
             
-        with tf.variable_scope('logit'):
-            logits = self._fully_connected(x, self.hps.num_classes)
-            self.predictions = tf.nn.softmax(logits)
+        self._build_output(x)
             
-        with tf.variable_scope('costs'):
-            # loss
-            xent = tf.nn.softmax_cross_entropy_with_logits(
-                logits=logits, labels=self.labels)
-            self.cost = tf.reduce_mean(xent, name='xent')
-            self.cost += self._decay()
 
-            tf.summary.scalar('cost', self.cost)
-            
+class CNN_deep(Net):
+    def _build_model(self):
+        depth = 5
+        width = 100
+        
+        # So drop rate increase linearly from 0.0 to 0.5 w.r.t depth of the layer
+        drop_rate = 0.5/(depth+1)
+        
+        with tf.variable_scope('conv1'):
+            x = self._images
+            x = self._conv('conv', x, 3, 3, width, self._stride_arr(1))
+            x = self._add_bias('conv_bias', x, [width])
+            #x = tf.nn.dropout(x, 1-drop_rate)
+            # use leaky relu
+            x = self._relu(x, 0.01)
+                    
+        for i in six.moves.range(2, depth + 2):    
+            with tf.variable_scope('conv%d' % i):
+                x = self._max_pool2x2(x)
+                x = self._lrn(x)
+                
+                in_filters = width * (i-1)
+                out_filters = width * i
+                
+                x = self._conv('conv', x, 2, in_filters, out_filters, 
+                        self._stride_arr(1))
+                x = self._add_bias('conv_bias', x, [out_filters])
+                
+                x = tf.nn.dropout(x, 1.0-drop_rate*i)
+                x = self._relu(x, 0.01)
+        
+        with tf.variable_scope('local'):
+            x = self._lrn(x)       
+            x = self._fully_connected(x, width*depth/2)
+                        
+        self._build_output(x)
+        
+class CNN_fmp(Net):
+    def _build_model(self):
+        depth = 12
+        width = 32
+        drop_rate = 0.2/(depth+1)
+        pooling_ratio = 1.2
+         
+        with tf.variable_scope('conv1'):
+            x = self._images
+            # conv2x2 instead of 3x3
+            x = self._conv('conv', x, 2, 3, width, self._stride_arr(1))
+            x = self._add_bias('conv_bias', x, [width])
+            x = self._relu(x, 0.1)
+                    
+        for i in six.moves.range(2, depth + 2):    
+            with tf.variable_scope('conv%d' % i):
+                x = tf.nn.fractional_max_pool(x, pooling_ratio, overlapping=True,
+                    name='fmpool') 
+                #x = self._lrn(x)
+                
+                in_filters = width * (i-1)
+                out_filters = width * i
+                
+                x = self._conv('conv', x, 2, in_filters, out_filters, 
+                        self._stride_arr(1))
+                x = self._add_bias('conv_bias', x, [out_filters])
+                
+                x = tf.nn.dropout(x, 1.0-drop_rate*i)
+                x = self._relu(x, 0.1)
+                
+        with tf.variable_scope('conv%d' % (depth+2)):
+            in_filters = width * (depth + 1)
+            out_filters = width * (depth + 2)
+            # conv1x1 at tht last layer
+            x = self.conv('conv', x, 1, in_filters, 
+                out_filters, self._stride_arr(1))
+            x = self._add_bias('conv_bias', x, [out_filters])
+            x = self._relu(x, 0.1)
+        
+        with tf.variable_scope('local'):
+            x = self._lrn(x)       
+            x = self._fully_connected(x, width*depth)
+                        
+        self._build_output(x)
+        
+                
         
 
         
@@ -151,5 +253,16 @@ class CNN_base(Net):
         
         
         
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
           
                           

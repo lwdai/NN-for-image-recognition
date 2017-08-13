@@ -37,7 +37,7 @@ tf.app.flags.DEFINE_string('train_dir', '',
                            'Directory to keep training outputs.')
 tf.app.flags.DEFINE_string('eval_dir', '',
                            'Directory to keep eval outputs.')
-tf.app.flags.DEFINE_integer('eval_batch_count', 50,
+tf.app.flags.DEFINE_integer('eval_batch_count', 2000,
                             'Number of batches to eval.')
 tf.app.flags.DEFINE_bool('eval_once', False,
                          'Whether evaluate the model only once.')
@@ -47,8 +47,8 @@ tf.app.flags.DEFINE_string('log_root', '',
 tf.app.flags.DEFINE_integer('num_gpus', 1,
                             'Number of gpus used for training. (0 or 1)')
 tf.app.flags.DEFINE_string('model_name', 'CNN_base',
-                            'CNN_base or ...') 
-tf.app.flags.DEFINE_integer('max_steps', 10000,
+                            'CNN_base or ... CNN_deep') 
+tf.app.flags.DEFINE_integer('max_steps', 100000,
                             'max number of steps')                            
 
 def get_model(hps, images, labels, mode):
@@ -56,6 +56,11 @@ def get_model(hps, images, labels, mode):
     if FLAGS.model_name == 'CNN_base':
         sys.stdout.write('model=CNN_base\n')
         model = cnn_model.CNN_base(hps, images, labels, mode)
+        return model
+        
+    if FLAGS.model_name == 'CNN_deep':
+        sys.stdout.write('model=CNN_deep\n')
+        model = cnn_model.CNN_deep(hps, images, labels, mode)
         return model
     else:
         raise ValueError('model_name is not implemented.')
@@ -82,12 +87,14 @@ def train(hps):
   truth = tf.argmax(model.labels, axis=1)
   predictions = tf.argmax(model.predictions, axis=1)
   precision = tf.reduce_mean(tf.to_float(tf.equal(predictions, truth)))
+  error_rate = tf.reduce_mean(tf.to_float(tf.not_equal(predictions, truth)))
 
   summary_hook = tf.train.SummarySaverHook(
       save_steps=100,
       output_dir=FLAGS.train_dir,
       summary_op=tf.summary.merge([model.summaries,
-                                   tf.summary.scalar('Precision', precision)]))
+                                   tf.summary.scalar('Precision', precision),
+                                   tf.summary.scalar('Error', error_rate)]))
 
   logging_hook = tf.train.LoggingTensorHook(
       tensors={ 'step': model.global_step,
@@ -108,6 +115,7 @@ def train(hps):
 
     def after_run(self, run_context, run_values):
       train_step = run_values.results
+      """
       if train_step < 40000:
         self._lrn_rate = 0.1
       elif train_step < 60000:
@@ -116,7 +124,16 @@ def train(hps):
         self._lrn_rate = 0.001
       else:
         self._lrn_rate = 0.0001
-
+      """
+      # use exponential decay; by a factor of 0.1 per 30000 steps
+      if train_step < 10000:
+        self._lrn_rate = 0.1
+      elif self._lrn_rate > hps.min_lrn_rate:
+        self._lrn_rate = self._lrn_rate * 0.999923
+      
+  
+  gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.45)
+  
   with tf.train.MonitoredTrainingSession(
       checkpoint_dir=FLAGS.log_root,
       hooks=[logging_hook, _LearningRateSetterHook(),
@@ -125,7 +142,8 @@ def train(hps):
       # Since we provide a SummarySaverHook, we need to disable default
       # SummarySaverHook. To do that we set save_summaries_steps to 0.
       save_summaries_steps=0,
-      config=tf.ConfigProto(allow_soft_placement=True)) as mon_sess:
+      config=tf.ConfigProto(allow_soft_placement=True, gpu_options=gpu_options),
+      save_checkpoint_secs=120) as mon_sess:
     while not mon_sess.should_stop():
       mon_sess.run(model.train_op)
 
@@ -139,7 +157,10 @@ def evaluate(hps):
   saver = tf.train.Saver()
   summary_writer = tf.summary.FileWriter(FLAGS.eval_dir)
 
-  sess = tf.Session(config=tf.ConfigProto(allow_soft_placement=True))
+  gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.2)
+  
+  sess = tf.Session(config=tf.ConfigProto(allow_soft_placement=True,
+    gpu_options=gpu_options))
   tf.train.start_queue_runners(sess)
 
   best_precision = 0.0
@@ -173,6 +194,12 @@ def evaluate(hps):
     precision_summ.value.add(
         tag='Precision', simple_value=precision)
     summary_writer.add_summary(precision_summ, train_step)
+    
+    error_rate = 1.0 - 1.0 * correct_prediction / total_prediction
+    error_summ = tf.Summary()
+    error_summ.value.add(tag='Error', simple_value=error_rate)
+    summary_writer.add_summary(error_summ, train_step)
+    
     best_precision_summ = tf.Summary()
     best_precision_summ.value.add(
         tag='Best Precision', simple_value=best_precision)
@@ -185,7 +212,7 @@ def evaluate(hps):
     if FLAGS.eval_once:
       break
 
-    time.sleep(60)
+    time.sleep(30)
 
 
 def main(_):
@@ -197,9 +224,9 @@ def main(_):
     raise ValueError('Only support 0 or 1 gpu.')
 
   if FLAGS.mode == 'train':
-    batch_size = 128
+    batch_size = 32
   elif FLAGS.mode == 'eval':
-    batch_size = 100
+    batch_size = 5
 
   if FLAGS.dataset == 'cifar10':
     num_classes = 10
