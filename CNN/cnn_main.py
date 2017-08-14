@@ -47,7 +47,7 @@ tf.app.flags.DEFINE_string('log_root', '',
 tf.app.flags.DEFINE_integer('num_gpus', 1,
                             'Number of gpus used for training. (0 or 1)')
 tf.app.flags.DEFINE_string('model_name', 'CNN_base',
-                            'CNN_base or ... CNN_deep') 
+                            'CNN_base or CNN_deep or CNN_fmp or CNN_NiN') 
 tf.app.flags.DEFINE_integer('max_steps', 100000,
                             'max number of steps')                            
 
@@ -61,6 +61,16 @@ def get_model(hps, images, labels, mode):
     if FLAGS.model_name == 'CNN_deep':
         sys.stdout.write('model=CNN_deep\n')
         model = cnn_model.CNN_deep(hps, images, labels, mode)
+        return model
+        
+    if FLAGS.model_name == 'CNN_fmp':
+        sys.stdout.write('model=CNN_fmp\n')
+        model = cnn_model.CNN_fmp(hps, images, labels, mode)
+        return model
+        
+    if FLAGS.model_name == 'CNN_NiN':
+        sys.stdout.write('model=CNN_NiN\n')
+        model = cnn_model.CNN_NiN(hps, images, labels, mode)
         return model
     else:
         raise ValueError('model_name is not implemented.')

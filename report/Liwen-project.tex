@@ -1,0 +1,119 @@
+\documentclass[conference]{IEEEtran}
+\IEEEoverridecommandlockouts
+% The preceding line is only needed to identify funding in the first footnote. If that is unneeded, please comment it out.
+\usepackage{cite}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{algorithmic}
+\usepackage{graphicx}
+\usepackage[]{hyperref}
+\usepackage{textcomp}
+\def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
+    T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
+\begin{document}
+
+\title{Exploring Convolutional Neural Networks for Image Classification Problem \\
+\author{\IEEEauthorblockN{Liwen Dai}
+\IEEEauthorblockA{
+\textit{20552153,}
+L7DAI@uwaterloo.ca}}
+}
+
+\maketitle
+
+\begin{abstract}
+In this project, I have built and trained neural networks to solve the image classification problem on the CIFAR-10 dataset. First I reimplemented a model provided by Tensorflow with two convolutional layers as a baseline. Next I reshaped the network by stacking multiple convolutional layers. I also attempted to make the network deeper by adding network-in-network layers and using fractional max pooling. My best result beat the baseline with 86\% accuracy on the test set as well as a much faster speed of convergence.\\   
+\end{abstract}
+
+\begin{IEEEkeywords}
+image classification, convolution, neural networks, deep learning, artificial intelligence
+\end{IEEEkeywords}
+
+\section{Introduction}
+CIFAR-10 and CIFAR-100 are two famous datasets to benchmark image classification algorithms \cite{cifar}. The CIFAR-10 dataset consists of 60000 32x32 images in 10 classes, with 5000 training images and 1000 test images each class. The CIFAR-100 datset is similar to CIFAR-10, but is has 100 classes containing 600 images each. An incomplete leaderboard on these two datasets has been collected by \cite{leaderboard}.
+
+Neural networks, particularly, different variations of convolutional networks, have been proved the most effective methods for the task of image classfication. As in \cite{leaderboard}, they have occupied all the top results. But working real-world images of medium or high resolution requires very large neural networks, containing more than millions of parameters, which can be very slow to train\cite{conv}. For this reason many researchers choose to evaluate their methods on these tiny image data sets before scaling. 
+
+However, even with the complexity controlled by limiting the task on tiny images, the state-of-art results still rely on networks of considerable size\cite{frac}. I found it nearly impossible to replicate these models on my laptop, simply because the GPU would run out of memory or it would take too many days, even weeks to train. Considering this fact, the question has arised: what can we achieve if we perform deep learning tasks with limited computing resource? A very intuitive idea is to shrink a large neural network simply by reducing the number of parameters. Another idea is to limit the training to some acceptable time. 
+
+Based on the question above, I reimplemented a convolutional network provided by Tensorflow\cite{tut} as a baseline; then I built deeper networks using multiple techniques, including stacking convolutional layers, adding network-in-network layers and fractional max pooling.
+
+After applying different combinations of techniques and parameter settings, my best model beat the baseline and achieved 86\% test accuracy on the CIFAR-10 data set. Besides that, my model also had a much faster training speed to reach convergence.
+
+I concluded that although networks with shrinked size cannot reach the state-of-art results on CIFAR-10 \cite{leaderboard}, there's still room for improvement. I also discovered that techniques such as dropout may not be as effective in small networks as they are in the larger conterparts. I expect these results and discoveries to be helpful when tackling more complicated problems with limited computing power.
+
+\section{Related Works}
+placeholder
+\subsection{Maintaining the Integrity of the Specifications}
+
+placeholder
+
+\section{Prepare Your Paper Before Styling}
+placeholder
+
+
+\subsection{Units}
+\begin{itemize}
+\item blank
+\item blank
+\end{itemize}
+
+\subsection{Equations}
+\begin{equation}
+a+b=\gamma\label{eq}
+\end{equation}
+blank
+
+\subsection{\LaTeX-Specific Advice}
+
+placeholder
+
+
+\subsection{Authors and Affiliations}
+placeholder
+
+\subsection{Identify the Headings}
+placeholder
+
+\subsection{Figures and Tables}
+\paragraph{Positioning Figures and Tables} placeholder
+
+\begin{table}[htbp]
+\caption{Table Type Styles}
+\begin{center}
+\begin{tabular}{|c|c|c|c|}
+\hline
+\textbf{Table}&\multicolumn{3}{|c|}{\textbf{Table Column Head}} \\
+\cline{2-4} 
+\textbf{Head} & \textbf{\textit{Table column subhead}}& \textbf{\textit{Subhead}}& \textbf{\textit{Subhead}} \\
+\hline
+copy& More table copy$^{\mathrm{a}}$& &  \\
+\hline
+\multicolumn{4}{l}{$^{\mathrm{a}}$Sample of a Table footnote.}
+\end{tabular}
+\label{tab1}
+\end{center}
+\end{table}
+
+\begin{figure}[htbp]
+\centerline{\includegraphics[width=0.45\textwidth]{fig1.png}}
+\caption{Example of a figure caption.}
+\label{fig}
+\end{figure}
+
+placeholder
+
+\section*{Acknowledgment}
+
+placeholder
+
+
+
+\begin{thebibliography}{00}
+\bibitem{cifar} Krizhevsky, Alex, and Geoffrey Hinton. ``Learning multiple layers of features from tiny images.'' (2009).
+\bibitem{leaderboard} Rodrigo Benenson. ``Classification datasets results.'' \url{http://rodrigob.github.io/are_we_there_yet/build/classification_datasets_results.html}
+\bibitem{conv}Krizhevsky, Alex, Ilya Sutskever, and Geoffrey E. Hinton. ``Imagenet classification with deep convolutional neural networks.'' Advances in neural information processing systems. 2012.
+\bibitem{frac} Graham, Benjamin. ``Fractional max-pooling.'' arXiv preprint arXiv:1412.6071 (2014).
+\bibitem{tut} ``Convolutional Neural Networks.'' \url{ https://www.tensorflow.org/tutorials/deep_cnn}
+\end{thebibliography}
+
+\end{document}

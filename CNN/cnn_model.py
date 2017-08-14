@@ -4,6 +4,7 @@ from collections import namedtuple
 import numpy as np
 import tensorflow as tf
 import six
+from tensorflow.python.training import moving_averages
 
 HParams = namedtuple('HParams',
                      'batch_size, num_classes, lrn_rate, min_lrn_rate, '
@@ -16,6 +17,7 @@ class Net(object):
         self._images = images
         self.labels = labels
         self.mode = mode # 'train' or 'eval'
+        self._extra_train_ops = []
         
     def build_graph(self):
         """Build a whole graph for the model."""
@@ -48,9 +50,8 @@ class Net(object):
         apply_op = optimizer.apply_gradients(
             zip(grads, trainable_variables),
             global_step=self.global_step, name='train_step')
-
-        # No extra train ops for now
-        train_ops = [apply_op]
+        
+        train_ops = [apply_op] + self._extra_train_ops
         self.train_op = tf.group(*train_ops)
       
     # To use weight, put 'DW' in the name of variable  
@@ -123,7 +124,52 @@ class Net(object):
             self.cost = tf.reduce_mean(xent, name='xent')
             self.cost += self._decay()
 
-            tf.summary.scalar('cost', self.cost)       
+            tf.summary.scalar('cost', self.cost)
+            
+    def _batch_norm(self, name, x):
+        """Batch normalization."""
+        with tf.variable_scope(name):
+          params_shape = [x.get_shape()[-1]]
+
+          beta = tf.get_variable(
+              'beta', params_shape, tf.float32,
+              initializer=tf.constant_initializer(0.0, tf.float32))
+          gamma = tf.get_variable(
+              'gamma', params_shape, tf.float32,
+              initializer=tf.constant_initializer(1.0, tf.float32))
+
+          if self.mode == 'train':
+            mean, variance = tf.nn.moments(x, [0, 1, 2], name='moments')
+
+            moving_mean = tf.get_variable(
+                'moving_mean', params_shape, tf.float32,
+                initializer=tf.constant_initializer(0.0, tf.float32),
+                trainable=False)
+            moving_variance = tf.get_variable(
+                'moving_variance', params_shape, tf.float32,
+                initializer=tf.constant_initializer(1.0, tf.float32),
+                trainable=False)
+
+            self._extra_train_ops.append(moving_averages.assign_moving_average(
+                moving_mean, mean, 0.9))
+            self._extra_train_ops.append(moving_averages.assign_moving_average(
+                moving_variance, variance, 0.9))
+          else:
+            mean = tf.get_variable(
+                'moving_mean', params_shape, tf.float32,
+                initializer=tf.constant_initializer(0.0, tf.float32),
+                trainable=False)
+            variance = tf.get_variable(
+                'moving_variance', params_shape, tf.float32,
+                initializer=tf.constant_initializer(1.0, tf.float32),
+                trainable=False)
+            tf.summary.histogram(mean.op.name, mean)
+            tf.summary.histogram(variance.op.name, variance)
+          # epsilon used to be 1e-5. Maybe 0.001 solves NaN problem in deeper net.
+          y = tf.nn.batch_normalization(
+              x, mean, variance, beta, gamma, 0.001)
+          y.set_shape(x.get_shape())
+          return y     
         
         
                 
@@ -198,25 +244,28 @@ class CNN_deep(Net):
                         
         self._build_output(x)
         
-class CNN_fmp(Net):
+class CNN_NiN(Net):
     def _build_model(self):
-        depth = 12
-        width = 32
-        drop_rate = 0.2/(depth+1)
-        pooling_ratio = 1.2
-         
+        depth = 5
+        width = 100
+        
+        # So drop rate increase linearly from 0.0 to 0.5 w.r.t depth of the layer
+        drop_rate = 0.3/(depth+1)
+        
         with tf.variable_scope('conv1'):
             x = self._images
-            # conv2x2 instead of 3x3
-            x = self._conv('conv', x, 2, 3, width, self._stride_arr(1))
+            x = self._conv('conv', x, 3, 3, width, self._stride_arr(1))
             x = self._add_bias('conv_bias', x, [width])
-            x = self._relu(x, 0.1)
+            #x = tf.nn.dropout(x, 1-drop_rate)
+            # use leaky relu
+            x = self._relu(x, 0.3)
+            x = self._conv('NiN', x, 1, width, width,
+                        self._stride_arr(1))
                     
         for i in six.moves.range(2, depth + 2):    
             with tf.variable_scope('conv%d' % i):
-                x = tf.nn.fractional_max_pool(x, pooling_ratio, overlapping=True,
-                    name='fmpool') 
-                #x = self._lrn(x)
+                x = self._max_pool2x2(x)
+                x = self._lrn(x)
                 
                 in_filters = width * (i-1)
                 out_filters = width * i
@@ -226,16 +275,72 @@ class CNN_fmp(Net):
                 x = self._add_bias('conv_bias', x, [out_filters])
                 
                 x = tf.nn.dropout(x, 1.0-drop_rate*i)
-                x = self._relu(x, 0.1)
+                x = self._relu(x, 0.3)
+                                
+                x = self._conv('NiN', x, 1, out_filters, out_filters,
+                                self._stride_arr(1))
+                                    
+        with tf.variable_scope('local1'):
+            x = self._lrn(x)       
+            x = self._fully_connected(x, width*depth)
+        
+        with tf.variable_scope('local2'):      
+            x = self._fully_connected(x, width*depth/2)
+                        
+        self._build_output(x)
+        
+class CNN_fmp(Net):
+    def _build_model(self):
+        depth = 12
+        width = 32
+        drop_rate = 0.2/(depth+2)
+        pooling_ratio = 1.2
+         
+        with tf.variable_scope('conv1'):
+            x = self._images
+            # conv2x2 instead of 3x3
+            print('image', x.get_shape())
+            x = self._conv('conv', x, 2, 3, width, self._stride_arr(1))
+            x = self._add_bias('conv_bias', x, [width])
+            
+            x = self._lrn(x)
+            #x = self._batch_norm("batch_norm", x)
+            x = self._relu(x, 0.3)
+        
+        print('image after conv1', x.get_shape())            
+        for i in six.moves.range(2, depth + 2):    
+            with tf.variable_scope('conv%d' % i):
+                x, _, _ = tf.nn.fractional_max_pool(x, 
+                    [1.0, pooling_ratio, pooling_ratio, 1.0],
+                    overlapping=True,
+                    name='fmpool') 
+                    
+                x = self._lrn(x)
+                print('image after conv%d' % i, x.get_shape())
+                
+                in_filters = width * (i-1)
+                out_filters = width * i
+                
+                x = self._conv('conv', x, 2, in_filters, out_filters, 
+                        self._stride_arr(1))
+                x = self._add_bias('conv_bias', x, [out_filters])
+                
+                #x = self._batch_norm("batch_norm", x)
+                x = self._relu(x, 0.3)
+                x = tf.nn.dropout(x, 1.0-drop_rate*i)
+                
                 
         with tf.variable_scope('conv%d' % (depth+2)):
             in_filters = width * (depth + 1)
             out_filters = width * (depth + 2)
             # conv1x1 at tht last layer
-            x = self.conv('conv', x, 1, in_filters, 
+            x = self._conv('conv', x, 1, in_filters, 
                 out_filters, self._stride_arr(1))
             x = self._add_bias('conv_bias', x, [out_filters])
-            x = self._relu(x, 0.1)
+            
+            #x = self._batch_norm("batch_norm", x)
+            x = self._relu(x, 0.3)
+            x = tf.nn.dropout(x, 1.0-drop_rate*(depth+2))
         
         with tf.variable_scope('local'):
             x = self._lrn(x)       
