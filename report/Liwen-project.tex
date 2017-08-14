@@ -7,6 +7,7 @@
 \usepackage{graphicx}
 \usepackage[]{hyperref}
 \usepackage{textcomp}
+\usepackage{placeins}
 \def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
     T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
 \begin{document}
@@ -89,51 +90,109 @@ x, & \text{for } x >= 0\\
 $$
 As we can see, conventional ReLU is a special case of leaky ReLU by setting the constant factor $\alpha=0$. Adding a small positive gradients for negative input ($\alpha=0.01$) can address the issue of  ``dead'' ReLUs by giving them a chance to recover\cite{leaky}. It was even found that setting $\alpha=1/3$ could speed up learning without harming the representation power of the network \cite{sparse}.
 
-\subsection{Implementation}
+\section{Implementation}
+My source code can be found at Github \url{https://github.com/lwdai/NN-for-image-recognition}
+\subsection*{Network Architecture}
+I implemented and trained four convolutional neural network models on the CIFAR-10 datset. The four models are: CNBase, CNDeep, CNNiN, CNFmp. Figure \ref{fig1} shows the structure of CNBase and CNDeep. CNNiN and CNFmp were variations of CNDeep, as explained below.
 
-placeholder
+\subsubsection*{CNBase}
+The CNBase model was my reimplementation of the tensorflow example\cite{tut}, since the original code was too messy to be my starting point. It consisted of 2 convolutional layers, followed by 2 fully connected layers, and a final output layer. 2x2 max-pooling was applied after each convolutional layer. Conventional ReLUs were used without any leakiness. This model contained 1.76 million parameters.
 
+\subsubsection*{CNDeep}
+Inspired by the design of spatially sparse convolutional networks\cite{sparse}, I implemented the CNDeep model by stacking 6 convolutional layers, which was essentially $CN(100,6)$. In \cite{sparse, fmp} $k=300$ was used as the width factor, but I shrinked it to $100$ due to limited computing resource. I used only one fully connected layer instead of two as in CNBase, because I would expect enough representation power due to increased depth, as in \cite{res, wide}. This model contained 2.96 million parameters. No pooling was applied after the final convolutional layer, because the image size would be 1x1 already. I applied linearly increasing dropout ratios to each convolutional layer, except for the first one, with the max dropout ratios of $0.0, 0.2 \text{ and } 0.5$. For leaky ReLUs $\alpha=0.01$ was used in the final version.
 
-\subsection{Authors and Affiliations}
-placeholder
+\subsubsection*{CNNiN}
+CNNiN was the ``network-in-network''\cite{nin} version of $CNDeep$. The major change was that after each convolutional layer, an NiN layer, conv1x1 was applied with the same number of filters. Another change was that an extra fully connected layer with 500 neurons was added before FC250, due to the possible increase in its representative power. I used linearly increasing drop ratio with a max rate of $0.3$. Leaky ReLUs with $\alpha=0.3$ was used. Adding NiN made this model contain 12 convolutional layers, and 4.14 million parameters. We can see the number of parameters was controlled, w.r.t. the difference in depth from CNNDeep.
 
-\subsection{Identify the Headings}
-placeholder
+\begin{figure}[htbp]
+\centerline{\includegraphics[width=0.45\textwidth]{models.png}}
+\caption{The structure of two models: CNBase and CNDeep. ``FC 384'' represents a fully connected layer with 384 neurons etc.}
+\label{fig1}
+\end{figure}
 
-\subsection{Figures and Tables}
-\paragraph{Positioning Figures and Tables} placeholder
+\subsubsection*{CNFmp}
+Applying fractional max pooling \cite{fmp} to CNDeep allowed stacking 13 convolutional layers, as in figure \ref{fig2}. Adding a final NiN layer made a total of 14 convolutional layers with a shape similar to $CN(32, 13)$. I shrinked the width factor $k$ to 32 so that the total number of parameters was controlled to 3.35 million. I used leaky ReLU with $\alpha=0.3$. Dropout rates increased linearly from $0.0$ to $0.2$.
+
+\begin{figure}[htbp]
+\centerline{\includegraphics[width=0.3\textwidth]{fmp_model.png}}
+\caption{The structure of CNFmp. It stacked 14 convolutional layers and 12 1.2x1.2 fractional max pooling operations.}
+\label{fig2}
+\end{figure}
+
+\subsection*{Expriment Setup}
+I implemented all the convolutional network models using Python 2.7 and Tensorflow. All the training and evaluation were running on my laptop with GPU 3GB GTX 770M.
+
+I picked the GradientDescent Optimizer. I also tried other optimizers including Adam and Momentum, but coundn't get them to work, possibly due to proper parameter settings.
+
+I set the learning rate to start with 0.1, which decayed exponentially after the first 10,000 steps. Approximately every 30,000 steps the learning rate was multiplied by a factor of 0.1. 
+
+I adjusted the batch size to be 32 for training and 5 for evaluation. The max training step was set to 100,000. Higher batch size had led to crash due to running out of video memory.
+
+In order to track the training state in real time, a checkpoint for the training model was saved every 2 minutes. A seperate process was running for evaluation on the test set, at the same time with the training process. The learner (training process) had no knowledge about the testing result.
+
+\section{Results}
+A short summary of my results can be found in table \ref{tab1}
 
 \begin{table}[htbp]
-\caption{Table Type Styles}
+\caption{Benchmark Summary}
 \begin{center}
 \begin{tabular}{|c|c|c|c|}
 \hline
-\textbf{Table}&\multicolumn{3}{|c|}{\textbf{Table Column Head}} \\
+\textbf{Model}&\multicolumn{3}{|c|}{\textbf{Details}} \\
 \cline{2-4} 
-\textbf{Head} & \textbf{\textit{Table column subhead}}& \textbf{\textit{Subhead}}& \textbf{\textit{Subhead}} \\
+\textbf{Name} & \textbf{\textit{\#Parameters}}& \textbf{\textit{Test Accuracy \%}}& \textbf{\textit{Convergence Time}} \\
 \hline
-copy& More table copy$^{\mathrm{a}}$& &  \\
+CNBase &1.76M  & 80.6& $>$ 55K steps, 3 hours\\
 \hline
-\multicolumn{4}{l}{$^{\mathrm{a}}$Sample of a Table footnote.}
+CNDeep & 2.96M & 85.6 & 55K steps, 2 hours \\
+\hline
+CNNiN & 4.14M & 85.5& 6K steps, 3 hours \\
+\hline
+CNFmp & 3.35M & 79.6 & 80K steps, 10 hours \\
+\hline
+
 \end{tabular}
 \label{tab1}
 \end{center}
 \end{table}
 
 \begin{figure}[htbp]
-\centerline{\includegraphics[width=0.45\textwidth]{fig1.png}}
-\caption{Example of a figure caption.}
-\label{fig}
+\centerline{\includegraphics[width=0.45\textwidth]{result1.png}}
+\caption{Training results of CNBase, CNNiN and CNFmp. Training and test errors vs steps. The error axes were log scaled. Visualization was done by Tensorboard.}
+\label{fig3}
 \end{figure}
 
-placeholder
+
+\begin{table}[htbp]
+\caption{CNDeep with Different Dropout Rates}
+\begin{center}
+\begin{tabular}{|c|c|c|}
+\hline
+\textbf{Max Drop Rate}& \textbf{\textit{Test Accuracy \%}}& \textbf{\textit{Convergence Time}} \\
+\hline
+0.0  & 85.6& 55K steps, 2 hours\\
+\hline
+0.2 & 85.3 & 70K steps, 3 hours \\
+\hline
+0.5 & 83.2& 100K steps, 4 hours \\
+\hline
+\end{tabular}
+\label{tab2}
+\end{center}
+\end{table}
+
+\begin{figure}[htbp]
+\centerline{\includegraphics[width=0.45\textwidth]{result2.png}}
+\caption{Training results of CNDeep with differet max dropout rates. The error axes were log scaled. Visualization was done by Tensorboard.}
+\label{fig4}
+\end{figure}
 
 \section*{Acknowledgment}
 
 placeholder
 
 
-
+\FloatBarrier
 \begin{thebibliography}{00}
 \bibitem{cifar} Krizhevsky, Alex, and Geoffrey Hinton. ``Learning multiple layers of features from tiny images.'' (2009).
 \bibitem{leaderboard} Rodrigo Benenson. ``Classification datasets results.'' \url{http://rodrigob.github.io/are_we_there_yet/build/classification_datasets_results.html}
