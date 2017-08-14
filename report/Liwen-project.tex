@@ -50,21 +50,46 @@ It is worth mentioning that nowdays convolutional networks have grown deeper and
 
 \section{Methodology}
 \subsection*{Convolutional Layers}
+A convolutional layer consists of a 4-D weight matrix, with size $s\times s\times M \times N$, where each square filter (or patch, kernel) has size $s\times s$. $M$ is the number of input filters and $N$ is the number of output filters, which are also called the number of input (output) channels. In our case, the first convolutional layer of a network always accepts the image as input, which has 3 channels (RGB). When stacking multiple convolutional layers, we can notice that the number of output filters of a convolutional layer is always equal to the number of input filters of the next convolutional layer. As a result, we can omit $M$, and denote a convolutional layer as conv$s\times s \times N$. Since I was working on tiny images, I picked small filter size, including $s=1,2,3,5$. 
 
+Next how to choose $N$, the number of fitlers at each layer? I used the idea of linearly increasing number of filters with respect to the layer depth, which was inspired by the architecture of spatially sparse neural networks\cite{sparse}. Particularly, let $N = kl$, where $k$ is some width factor, thus the $l$-th convolutional layer in a network would consist of $kl$ filters.
 
-\subsection{Units}
-\begin{itemize}
-\item blank
-\item blank
-\end{itemize}
+Then how do we calucate the number of parameters in a network? Consider a network consisting of $L$ convolutional layers, so we have $l=1,2,3,...,L$. We assume all convolutional layers use patch size $s\times s$. The total number of weights of convolutional layers would be:
+$$s^2\times 3 \times k + s^2\times k \times 2k + s^2\times 2k \times 3k + ... + s^2 (L-1)k(Lk)$$ 
+$$ = O(k^2L^3)$$
+This shows the number of parameters, or the complexity, of a convolutional neural network, which is quadratic w.r.t the width factor $k$, and cubic w.r.t the depth factor $L$, providing a similar shape. We can notice that most parameters lie on the last few convolutional layers, while extra components, like fully connected layers, ususally do not increase this complexity. We use a similar notations as in \cite{sparse} to denote such convolutional net barebones as $CN(k, L)$.
 
-\subsection{Equations}
-\begin{equation}
-a+b=\gamma\label{eq}
-\end{equation}
-blank
+\subsection*{Loss Function}
+I picked softmax cross entropy between the network output and the true labels as the loss (cost) function \cite{cross}. It measures the probability error in discrete classification tasks where classes are mutually exclusive. I also used weight decay at each convolutional layer, by adding the L2 loss (sum of squares for the weights) of each layer to the total loss, in order to penalize weights that are too large \cite{decay}.
 
-\subsection{\LaTeX-Specific Advice}
+\subsection*{Network-in-Network}
+Network-in-Network (NiN) is a special structure added after the convolutional layers, hence increasing the depth of the network yet without adding too much complexity\cite{nin}. An NiN layer is basically conv1x1, while the number of filters remains unchanged. The goal of adding these micro neural networks to more complex structures is to handle the variance of the local receptive fields, thus making the netwok more expressive. Researchers have found that adding NiN to conventional convolutional networks can significantly improve the accuracy on benchmarks\cite{sparse,fmp,nin}
+
+\subsection*{Fractional Max Pooling}
+Fractional max pooling (FMP) is another technique to stack more convolutional layers \cite{fmp}. Convolutional networks almost always include some spatial pooling, and often it is a 2x2 max-pooling \cite{conv}. Such max-pooling acts on the hidden convolutional layers; and each pooling has an inevitable side effect of discarding 75\% of the data. 2x2 max-pooling also limits the depth of a network. Since CIFAR-10 has images of size only 32x32, the 2x2 max-pooling can be performed at most 5 times before the size reaches 1x1.
+
+Methods to get around this problem include pooling from overlapping regions and stochastic pooling\cite{fmp}. However both these techniques still reduce the size of the hidden layers by a factor of two, while intuitively we can discard data in a gentler way. FMP combined the idea of both these techniques: it pools stochastically, and preferably pools from overlapping regions. As a result, each pooling only reduces the size of image by a factor of $\alpha$ with $1 < \alpha < 2$; thus the average pooling region is only $\alpha \times \alpha$\cite{fmp}. Particularly, setting $\alpha =1.4$ allows us to pool $8$ times from a 32x32 image; and setting $\alpha=1.2$ allows us to pool 12 times (due to rounding down). 
+
+\subsection*{Data Augmentation}
+Data augmentation has been used widely in neural networks to reduce overfitting\cite{conv}. However to reach the best results, heavy data augmentation may not be necessary\cite{wide}. I used data augmentation methods in the following order: padding the image to size 36x36; random cropping by size 3; random horizontal flip; and finally per-image standarization, so that each image is linearly scaled to have zero mean and unit norm.
+
+\subsection*{Dropout}
+As in \cite{conv}, dropout consists of setting to zero the output of each hidden neuron with probablity 0.5, which is a very effective way to reduce test errors. Some researchers believed that deeper layers tend to be more sensitive to dropout, while shallower layers tend to be relatively robust\cite{sparse,fmp}. A new idea came out: using linearly increasing dropout ratio w.r.t layer depth, from 0 at the first convolutional layer, to 0.5 at the last convolutional layer\cite{sparse,fmp}. I applied linearly increasing dropout and compared with the zero-dropout counterpart.
+
+\subsection*{Leaky ReLUs}
+Rectified Linear Units(ReLUs) have been used widely in convolutional neural networks, since it can make the training several times faster than the equivalents with $tanh$ units\cite{conv}. However, ReLUs have a potential disadvantage during training, because the gradient is 0 whenever the unit is not active. This could cause the problem that a neuron never activates as the gradient descent algorithm will not ajust its weight if the neuron is not activated from the beginning. The vanishing gradients problem could also make the learning slow for ReLU networks with constant 0 gradients\cite{leaky}.
+
+To solve the problem of ``dead'' ReLUs, leaky ReLUs was introduced\cite{leaky}. The idea is to use the following activation function in  instead of conventional ReLUs:
+$$
+f(x)=
+\begin{cases}
+x, & \text{for } x >= 0\\
+\alpha x, & \text{for } x < 0\\
+\end{cases}
+$$
+As we can see, conventional ReLU is a special case of leaky ReLU by setting the constant factor $\alpha=0$. Adding a small positive gradients for negative input ($\alpha=0.01$) can address the issue of  ``dead'' ReLUs by giving them a chance to recover\cite{leaky}. It was even found that setting $\alpha=1/3$ could speed up learning without harming the representation power of the network \cite{sparse}.
+
+\subsection{Implementation}
 
 placeholder
 
@@ -120,6 +145,9 @@ placeholder
 \bibitem{fmp} Graham, Benjamin. ``Fractional max-pooling.'' arXiv preprint arXiv:1412.6071 (2014).
 \bibitem{res} He, Kaiming, et al. ``Deep residual learning for image recognition.'' Proceedings of the IEEE conference on computer vision and pattern recognition. 2016.
 \bibitem{wide} Zagoruyko, Sergey, and Nikos Komodakis. ``Wide residual networks.'' arXiv preprint arXiv:1605.07146 (2016).
+\bibitem{cross} De Boer, Pieter-Tjerk, et al. ``A tutorial on the cross-entropy method.'' Annals of operations research 134.1 (2005): 19-67.
+\bibitem{decay} Krogh, Anders, and John A. Hertz. "A simple weight decay can improve generalization." Advances in neural information processing systems. 1992.
+\bibitem{leaky} Maas, Andrew L., Awni Y. Hannun, and Andrew Y. Ng. ``Rectifier nonlinearities improve neural network acoustic models.'' Proc. ICML. Vol. 30. No. 1. 2013.
 \end{thebibliography}
 
 \end{document}
