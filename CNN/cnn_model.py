@@ -173,10 +173,7 @@ class Net(object):
         
         
                 
-class CNN_base(Net):
-    #def __init__(self, hps, images, labels, mode):
-    #    super(CNN_base, self).__init__(hps, images, labels, mode)
-        
+class CNN_base(Net):       
     # Basically the model at models/tutorials/image/cifar10/cifar10.py
     def _build_model(self):
         with tf.variable_scope('conv1'):
