@@ -39,16 +39,17 @@ Based on the question above, I reimplemented a convolutional network provided by
 
 After applying different combinations of techniques and parameter settings, my best model beat the baseline and achieved 86\% test accuracy on the CIFAR-10 data set. Besides that, my model also had a much faster training speed to reach convergence.
 
-I concluded that although networks with shrinked size cannot reach the state-of-art results on CIFAR-10 \cite{leaderboard}, there's still room for improvement. I also discovered that techniques such as dropout may not be as effective in small networks as they are in the larger conterparts. I expect these results and discoveries to be helpful when tackling more complicated problems with limited computing power.
+I concluded that although networks with shrinked size cannot reach the state-of-art results on CIFAR-10 \cite{leaderboard}, there's still room for improvement. I also discovered that techniques such as dropout may not be as effective in small networks as they are in the larger counterparts. I expect these results and discoveries to be helpful when tackling more complicated problems with limited computing power.
 
-\section{Related Works}
-placeholder
-\subsection{Maintaining the Integrity of the Specifications}
+\section{Related Work}
+Convolutional neural network has been a very big jump for image classification and object recognition tasks, since introduced as Alexnet\cite{conv}. Alexnet won the ImageNet LSVRC-2010 completition with top-1 error rate of 37.5\% and top-5 error rate of 17.0\%, while the second best model had only reached 45.7\% and 25.7\%\cite{conv}. This neural network had 60 million parameters and 650,000 neurons, consisting of five convolutional layers, with max-pooling layers, dropout, followed by three fully-connected layers and a final softmax output layer\cite{conv}.
 
-placeholder
+In the recent few years, a lot of researchers have applied various techniques to improve the performance of convolutional networks, and many have benchmarked their models on the tiny image data sets, CIFAR-10 and CIFAR-100. The ``Network in Network'' structure was introduce to enhance the model discriminablility for local receptive fields, which achieved 91.2\% and 64.3\% accuracy on CIFAR-10 and CIFAR-100, respectively\cite{nin}. Spatially-sparse convolutional neural networks improved this accuracy to 93.72\% and 75.7\%\cite{sparse}. Applying fractional max pooling pushed the result on CIFAR-10 further to 96.53\%\cite{fmp}. The deep residual network introduced by Mirosoft reached 93.57\% on CIFAR-10\cite{res}; and its ``wide'' variance even reached 96.62\% and 81.7\%, with a much faster training speed\cite{wide}.
 
-\section{Prepare Your Paper Before Styling}
-placeholder
+It is worth mentioning that nowdays convolutional networks have grown deeper and deeper. Alexnet had 5 convolutional layers and was titled ``Deep convolutional Neural Networks'' when published in 2012\cite{res}. The spatially sparse net with fractional max pooling benchmarked on CIFAR-100 with 14 convolutional layers\cite{fmp}. The deep residual net was even implemented with 1000 layers on CIFAR-10\cite{res}. Luckily, going deeper is not always necessary: the wide but ``shallow'' residual nets reached the top accuracy with 28 convolutional layers\cite{wide} 
+
+\section{Methodology}
+\subsection*{Convolutional Layers}
 
 
 \subsection{Units}
@@ -114,6 +115,11 @@ placeholder
 \bibitem{conv}Krizhevsky, Alex, Ilya Sutskever, and Geoffrey E. Hinton. ``Imagenet classification with deep convolutional neural networks.'' Advances in neural information processing systems. 2012.
 \bibitem{frac} Graham, Benjamin. ``Fractional max-pooling.'' arXiv preprint arXiv:1412.6071 (2014).
 \bibitem{tut} ``Convolutional Neural Networks.'' \url{ https://www.tensorflow.org/tutorials/deep_cnn}
+\bibitem{nin} Lin, Min, Qiang Chen, and Shuicheng Yan. ``Network in network.'' arXiv preprint arXiv:1312.4400 (2013).
+\bibitem{sparse} Graham, Benjamin. ``Spatially-sparse convolutional neural networks.'' arXiv preprint arXiv:1409.6070 (2014).
+\bibitem{fmp} Graham, Benjamin. ``Fractional max-pooling.'' arXiv preprint arXiv:1412.6071 (2014).
+\bibitem{res} He, Kaiming, et al. ``Deep residual learning for image recognition.'' Proceedings of the IEEE conference on computer vision and pattern recognition. 2016.
+\bibitem{wide} Zagoruyko, Sergey, and Nikos Komodakis. ``Wide residual networks.'' arXiv preprint arXiv:1605.07146 (2016).
 \end{thebibliography}
 
 \end{document}
