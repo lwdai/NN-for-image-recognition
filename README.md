@@ -7,6 +7,8 @@ much faster speed of convergence.
 
 > Index Terms—image classification, convolution, neural networks, deep learning, artificial intelligence
 
+> [Complete Report](report/Liwen-project.pdf)
+
 ====================
 > Need to have GPU version of tensorflow installed: https://www.tensorflow.org/  
 > Tested on python 2.7   
