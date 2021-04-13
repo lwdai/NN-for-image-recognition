@@ -1,4 +1,11 @@
 # NN-for-image-recognition
+> In this project, I have built and trained neural networks to solve the image classification problem on the CIFAR10 dataset. 
+First I reimplemented a model provided by Tensorflow with two convolutional layers as a baseline. Next I reshaped the network by stacking multiple convolutional layers. 
+I also attempted to make the network deeper by adding network-innetwork layers and using fractional max pooling. My best result
+beat the baseline with 86% accuracy on the test set as well as a
+much faster speed of convergence.
+
+> Index Terms—image classification, convolution, neural networks, deep learning, artificial intelligence
 
 ====================
 > Need to have GPU version of tensorflow installed: https://www.tensorflow.org/  
